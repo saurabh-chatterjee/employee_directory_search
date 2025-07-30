@@ -22,6 +22,12 @@ graph TB
         KG[Knowledge Graph Manager]
     end
     
+    subgraph "Knowledge Graph Layer"
+        JSON_KG[JSON Knowledge Graph<br/>File-based + NetworkX]
+        NEO4J_KG[Neo4j Knowledge Graph<br/>Graph Database + In-Memory Fallback]
+        EXTRACTION[Entity & Relationship Extraction<br/>Single-Method Priority: LLM → Semantic → Rule-based]
+    end
+    
     subgraph "AI/ML Layer"
         LLM[LLM Manager]
         RAG_CHAIN[RAG Chain]
@@ -30,7 +36,9 @@ graph TB
     
     subgraph "Storage Layer"
         VDB[(Vector Database<br/>Chroma/FAISS)]
-        KGD[(Knowledge Graph<br/>JSON/NetworkX)]
+        JSON_STORE[(JSON Storage<br/>knowledge_graph.json)]
+        NEO4J_DB[(Neo4j Database<br/>Graph Storage)]
+        MEMORY[(In-Memory Storage<br/>Python Lists)]
         CACHE[(Cache Directory)]
         OUTPUT[(Output Directory)]
     end
@@ -39,6 +47,7 @@ graph TB
         OPENAI[OpenAI API]
         ANTHROPIC[Anthropic API]
         OLLAMA[Ollama Local]
+        NEO4J_SERVICE[Neo4j Service]
     end
     
     UI --> RAG
@@ -49,11 +58,20 @@ graph TB
     RAG --> DL
     RAG --> VS
     RAG --> KG
-    RAG --> LLM
+    
+    KG --> JSON_KG
+    KG --> NEO4J_KG
+    KG --> EXTRACTION
+    
+    JSON_KG --> JSON_STORE
+    NEO4J_KG --> NEO4J_DB
+    NEO4J_KG --> MEMORY
+    
+    EXTRACTION --> JSON_KG
+    EXTRACTION --> NEO4J_KG
     
     DL --> DS
     VS --> VDB
-    KG --> KGD
     LLM --> RAG_CHAIN
     
     RAG_CHAIN --> EMB
@@ -62,6 +80,8 @@ graph TB
     LLM --> OPENAI
     LLM --> ANTHROPIC
     LLM --> OLLAMA
+    
+    NEO4J_KG --> NEO4J_SERVICE
     
     VS --> CACHE
     KG --> CACHE
@@ -82,6 +102,14 @@ flowchart TD
     CreateComponents --> LLMManager[Initialize LLM Manager]
     CreateComponents --> KnowledgeGraph[Initialize Knowledge Graph]
     
+    KnowledgeGraph --> KGType{Knowledge Graph Type?}
+    KGType -->|JSON| JSONKG[Initialize JSON Knowledge Graph]
+    KGType -->|Neo4j| NEO4JKG[Initialize Neo4j Knowledge Graph]
+    
+    NEO4JKG --> Neo4jAvailable{Neo4j Available?}
+    Neo4jAvailable -->|Yes| UseNeo4j[Use Neo4j Database]
+    Neo4jAvailable -->|No| UseMemory[Use In-Memory Fallback]
+    
     DataLoader --> LoadDocs[Load Documents from Sources]
     LoadDocs --> ChunkDocs[Chunk Documents]
     ChunkDocs --> StoreDocs[Store in Vector Database]
@@ -89,15 +117,29 @@ flowchart TD
     VectorStore --> CreateEmbeddings[Create Document Embeddings]
     CreateEmbeddings --> StoreVectors[Store Vectors in Chroma/FAISS]
     
-    KnowledgeGraph --> ExtractEntities[Extract Entities & Relationships]
-    ExtractEntities --> BuildGraph[Build Knowledge Graph]
-    BuildGraph --> SaveGraph[Save Graph to JSON]
+    JSONKG --> ExtractEntitiesJSON[Extract Entities & Relationships]
+    UseNeo4j --> ExtractEntitiesNeo4j[Extract Entities & Relationships]
+    UseMemory --> ExtractEntitiesMemory[Extract Entities & Relationships]
+    
+    ExtractEntitiesJSON --> SingleMethodJSON[Single-Method Extraction<br/>LLM → Semantic → Rule-based]
+    ExtractEntitiesNeo4j --> SingleMethodNeo4j[Single-Method Extraction<br/>LLM → Semantic → Rule-based]
+    ExtractEntitiesMemory --> SingleMethodMemory[Single-Method Extraction<br/>LLM → Semantic → Rule-based]
+    
+    SingleMethodJSON --> BuildGraphJSON[Build Knowledge Graph]
+    SingleMethodNeo4j --> BuildGraphNeo4j[Build Knowledge Graph]
+    SingleMethodMemory --> BuildGraphMemory[Build Knowledge Graph]
+    
+    BuildGraphJSON --> SaveGraphJSON[Save Graph to JSON]
+    BuildGraphNeo4j --> SaveGraphNeo4j[Save Graph to Neo4j]
+    BuildGraphMemory --> SaveGraphMemory[Save Graph to Memory]
     
     LLMManager --> InitLLM[Initialize OpenAI/Anthropic/Ollama]
     
     StoreDocs --> Ready[System Ready]
     StoreVectors --> Ready
-    SaveGraph --> Ready
+    SaveGraphJSON --> Ready
+    SaveGraphNeo4j --> Ready
+    SaveGraphMemory --> Ready
     InitLLM --> Ready
     
     Ready --> UserQuestion{User Asks Question}
@@ -111,7 +153,14 @@ flowchart TD
     KeywordSearch --> ProcessResults
     
     ProcessResults --> QueryKG[Query Knowledge Graph]
-    QueryKG --> CombineContext[Combine Document Context + KG Insights]
+    QueryKG --> KGQueryType{Query Type?}
+    KGQueryType -->|JSON| QueryJSON[Query JSON Graph]
+    KGQueryType -->|Neo4j| QueryNeo4j[Query Neo4j Graph]
+    KGQueryType -->|Memory| QueryMemory[Query In-Memory Graph]
+    
+    QueryJSON --> CombineContext[Combine Document Context + KG Insights]
+    QueryNeo4j --> CombineContext
+    QueryMemory --> CombineContext
     
     CombineContext --> GeneratePrompt[Generate RAG Prompt]
     GeneratePrompt --> CallLLM[Call LLM API]
@@ -130,6 +179,47 @@ flowchart TD
     style VectorSearch fill:#f3e5f5
     style KeywordSearch fill:#f3e5f5
     style CallLLM fill:#e8f5e8
+    style UseMemory fill:#fff3e0
+    style SingleMethodJSON fill:#e3f2fd
+    style SingleMethodNeo4j fill:#e3f2fd
+    style SingleMethodMemory fill:#e3f2fd
+```
+
+## Entity & Relationship Extraction Flow
+
+```mermaid
+flowchart TD
+    DocumentText[Document Text] --> TryLLM[Try LLM Extraction]
+    
+    TryLLM --> LLMAvailable{LLM Available?}
+    LLMAvailable -->|No| TrySemantic[Try Semantic Search]
+    LLMAvailable -->|Yes| LLMProcess[Process with LLM]
+    
+    LLMProcess --> LLMResults{LLM Returns Results?}
+    LLMResults -->|Yes| UseLLM[Use LLM Results]
+    LLMResults -->|No| TrySemantic
+    
+    TrySemantic --> SemanticProcess[Process with spaCy NER + Dependency Parsing]
+    SemanticProcess --> SemanticResults{Semantic Returns Results?}
+    SemanticResults -->|Yes| UseSemantic[Use Semantic Results]
+    SemanticResults -->|No| UseRuleBased[Use Rule-Based Extraction]
+    
+    UseLLM --> Deduplicate[Remove Duplicates]
+    UseSemantic --> Deduplicate
+    UseRuleBased --> Deduplicate
+    
+    Deduplicate --> StoreResults[Store Results]
+    
+    StoreResults --> StorageType{Storage Type?}
+    StorageType -->|JSON| StoreJSON[Store in JSON File]
+    StorageType -->|Neo4j| StoreNeo4j[Store in Neo4j Database]
+    StorageType -->|Memory| StoreMemory[Store in Memory Lists]
+    
+    style DocumentText fill:#e1f5fe
+    style UseLLM fill:#c8e6c9
+    style UseSemantic fill:#fff3e0
+    style UseRuleBased fill:#ffcdd2
+    style StoreResults fill:#e8f5e8
 ```
 
 ## Data Flow Diagram
@@ -149,14 +239,14 @@ graph LR
         LOAD[Document Loader]
         CHUNK[Text Chunker]
         EMBED[Embedding Generator]
-        EXTRACT[Entity Extractor]
-        RELATE[Relationship Extractor]
+        EXTRACT[Entity Extractor<br/>Single-Method Priority]
     end
     
-    subgraph "Storage"
-        VECTORS[Vector Store]
-        GRAPH[Knowledge Graph]
-        METADATA[Document Metadata]
+    subgraph "Storage Options"
+        VECTORS[Vector Store<br/>Chroma/FAISS]
+        JSON_GRAPH[JSON Knowledge Graph<br/>File-based]
+        NEO4J_GRAPH[Neo4j Knowledge Graph<br/>Database]
+        MEMORY_GRAPH[In-Memory Graph<br/>Python Lists]
     end
     
     subgraph "Query Processing"
@@ -179,15 +269,19 @@ graph LR
     CHUNK --> EXTRACT
     
     EMBED --> VECTORS
-    EXTRACT --> RELATE
-    RELATE --> GRAPH
-    CHUNK --> METADATA
+    EXTRACT --> JSON_GRAPH
+    EXTRACT --> NEO4J_GRAPH
+    EXTRACT --> MEMORY_GRAPH
     
     QUERY --> SEARCH
     SEARCH --> VECTORS
-    SEARCH --> GRAPH
+    SEARCH --> JSON_GRAPH
+    SEARCH --> NEO4J_GRAPH
+    SEARCH --> MEMORY_GRAPH
     VECTORS --> CONTEXT
-    GRAPH --> CONTEXT
+    JSON_GRAPH --> CONTEXT
+    NEO4J_GRAPH --> CONTEXT
+    MEMORY_GRAPH --> CONTEXT
     CONTEXT --> LLM
     LLM --> ANSWER
 ```
@@ -201,6 +295,8 @@ sequenceDiagram
     participant D as Data Loader
     participant V as Vector Store
     participant K as Knowledge Graph
+    participant N as Neo4j Manager
+    participant J as JSON Manager
     participant L as LLM Manager
     participant O as OpenAI API
     
@@ -208,8 +304,23 @@ sequenceDiagram
     R->>D: Load Documents
     D->>V: Create Embeddings
     V->>V: Store Vectors
-    R->>K: Extract Entities
-    K->>K: Build Graph
+    
+    alt Knowledge Graph Type
+        R->>N: Initialize Neo4j Manager
+        N->>N: Check Neo4j Connection
+        alt Neo4j Available
+            N->>N: Use Neo4j Database
+        else Neo4j Unavailable
+            N->>N: Use In-Memory Fallback
+        end
+    else JSON Type
+        R->>J: Initialize JSON Manager
+    end
+    
+    R->>K: Extract Entities & Relationships
+    K->>K: Single-Method Extraction (LLM → Semantic → Rule-based)
+    K->>K: Store Results
+    
     R->>L: Initialize LLM
     L->>O: Test Connection
     R->>U: System Ready
@@ -221,8 +332,19 @@ sequenceDiagram
         V->>V: Keyword Search
     end
     V->>R: Return Documents
+    
     R->>K: Query Graph
-    K->>R: Return Insights
+    alt Neo4j Available
+        K->>N: Query Neo4j
+        N->>R: Return Insights
+    else In-Memory
+        K->>N: Query In-Memory
+        N->>R: Return Insights
+    else JSON
+        K->>J: Query JSON
+        J->>R: Return Insights
+    end
+    
     R->>L: Generate Answer
     L->>O: API Call
     O->>L: Response
@@ -254,14 +376,30 @@ graph TD
     LLMSuccess -->|Yes| UseLLM[Use Real LLM]
     LLMSuccess -->|No| DummyLLM[Use Dummy LLM]
     
-    UseLLM --> Success[System Operational]
-    DummyLLM --> Success
+    UseLLM --> TryNeo4j[Try Neo4j Connection]
+    DummyLLM --> TryNeo4j
+    
+    TryNeo4j --> Neo4jSuccess{Success?}
+    Neo4jSuccess -->|Yes| UseNeo4j[Use Neo4j Database]
+    Neo4jSuccess -->|No| UseMemory[Use In-Memory Storage]
+    
+    UseNeo4j --> TryExtraction[Try Entity Extraction]
+    UseMemory --> TryExtraction
+    
+    TryExtraction --> ExtractionSuccess{Success?}
+    ExtractionSuccess -->|Yes| UseExtraction[Use Extraction Results]
+    ExtractionSuccess -->|No| UseRuleBased[Use Rule-Based Fallback]
+    
+    UseExtraction --> Success[System Operational]
+    UseRuleBased --> Success
     
     style Start fill:#e1f5fe
     style Success fill:#c8e6c9
     style FallbackEmbed fill:#fff3e0
     style KeywordFallback fill:#fff3e0
     style DummyLLM fill:#ffcdd2
+    style UseMemory fill:#fff3e0
+    style UseRuleBased fill:#ffcdd2
 ```
 
 ## File Structure and Dependencies
@@ -274,6 +412,7 @@ graph TD
         DATA[data_loader.py]
         VECTOR[vector_store.py]
         KG[knowledge_graph.py]
+        NEO4J_KG[neo4j_knowledge_graph.py]
         LLM[llm_manager.py]
     end
     
@@ -287,12 +426,21 @@ graph TD
         ENV[.env]
         REQ[requirements.txt]
         ENV_EX[env_example.txt]
+        DOCKER[docker-compose.yml]
     end
     
     subgraph "Data"
         TEST_TXT[test.txt]
         CACHE[cache/]
         OUTPUT[output/]
+    end
+    
+    subgraph "Documentation"
+        README[README.md]
+        NEO4J_SUMMARY[NEO4J_INTEGRATION_SUMMARY.md]
+        EXTRACTION_SUMMARY[ENHANCED_EXTRACTION_SUMMARY.md]
+        SINGLE_METHOD[SINGLE_METHOD_EXTRACTION_SUMMARY.md]
+        IN_MEMORY[IN_MEMORY_FALLBACK_SUMMARY.md]
     end
     
     APP --> RAG
@@ -303,15 +451,18 @@ graph TD
     RAG --> DATA
     RAG --> VECTOR
     RAG --> KG
+    RAG --> NEO4J_KG
     RAG --> LLM
     
     DATA --> TEST_TXT
     VECTOR --> CACHE
     KG --> CACHE
+    NEO4J_KG --> CACHE
     RAG --> OUTPUT
     
     CONFIG --> ENV
     APP --> ENV
+    NEO4J_KG --> DOCKER
 ```
 
 ## Key Features and Capabilities
@@ -319,11 +470,12 @@ graph TD
 ### ✅ **Implemented Features:**
 - **Multi-format Document Loading**: TXT, PDF, MD, HTML, JSON, CSV
 - **Intelligent Text Chunking**: Configurable chunk sizes and overlap
-- **Vector Similarity Search**: ChromaDB and FAISS support
-- **Keyword Search Fallback**: When vector search fails
-- **Knowledge Graph Extraction**: Entity and relationship extraction
-- **Multiple LLM Support**: OpenAI, Anthropic, Ollama
-- **Robust Error Handling**: Multiple fallback mechanisms
+- **Vector Similarity Search**: ChromaDB and FAISS support with keyword fallback
+- **Dual Knowledge Graph Storage**: Neo4j (primary) + JSON (fallback)
+- **In-Memory Fallback**: Neo4j unavailable → in-memory storage
+- **Single-Method Extraction**: LLM → Semantic Search → Rule-based (priority-based)
+- **Multiple LLM Support**: OpenAI, Anthropic, Ollama with fallback LLM
+- **Robust Error Handling**: Multiple fallback mechanisms at every level
 - **Web Interface**: Streamlit-based UI
 - **Session Management**: Query history and persistence
 - **Extensible Architecture**: Easy to add new data sources and models
@@ -331,12 +483,21 @@ graph TD
 ### 🔄 **System Workflow:**
 1. **Initialization**: Load config, initialize components, load documents
 2. **Document Processing**: Chunk, embed, and store documents
-3. **Knowledge Extraction**: Build entity-relationship graph
-4. **Query Processing**: Retrieve relevant context, generate answers
-5. **Response Generation**: Combine context with LLM for final answer
+3. **Knowledge Extraction**: Single-method entity/relationship extraction
+4. **Storage Selection**: Neo4j (if available) or in-memory fallback
+5. **Query Processing**: Retrieve relevant context, generate answers
+6. **Response Generation**: Combine context with LLM for final answer
 
 ### 🎯 **Use Cases:**
 - **Document Q&A**: Ask questions about loaded documentation
 - **Knowledge Discovery**: Explore entities and relationships
 - **Research Assistant**: Multi-source information retrieval
-- **Content Analysis**: Extract insights from large document collections 
+- **Content Analysis**: Extract insights from large document collections
+- **Graph Analytics**: Query and visualize knowledge graphs
+
+### 🛡️ **Robustness Features:**
+- **Graceful Degradation**: System works even when components fail
+- **Multiple Fallbacks**: LLM → Semantic → Rule-based extraction
+- **Storage Flexibility**: Neo4j → In-Memory → JSON storage
+- **Error Recovery**: Automatic fallback to alternative methods
+- **Offline Capability**: Works without external services (except LLM) 
