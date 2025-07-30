@@ -70,7 +70,7 @@ A comprehensive Retrieval-Augmented Generation (RAG) system with knowledge graph
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd rag-knowledge-graph-system
+   cd employee_search_directory
    ```
 
 2. **Install dependencies**
