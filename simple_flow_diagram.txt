@@ -1,0 +1,276 @@
+RAG KNOWLEDGE GRAPH SYSTEM - FLOW DIAGRAM
+==========================================
+
+USER INTERFACE LAYER
+┌─────────────────┐
+│ Streamlit Web   │
+│ Command Line    │
+│ REST API        │
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────┐
+│ RAG SYSTEM      │
+│ ORCHESTRATOR    │
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────────────────────────────────────────────┐
+│                    CORE COMPONENTS                      │
+├─────────────────┬─────────────────┬─────────────────────┤
+│ Data Loader     │ Vector Store    │ Knowledge Graph     │
+│                 │ Manager         │ Manager             │
+├─────────────────┼─────────────────┼─────────────────────┤
+│ • Load docs     │ • Create        │ • Extract entities  │
+│ • Chunk text    │   embeddings    │ • Build graph       │
+│ • Parse formats │ • Store vectors │ • Query graph       │
+│ • Handle URLs   │ • Search docs   │ • Save to JSON      │
+└─────────┬───────┴─────────┬───────┴─────────┬───────────┘
+          │                 │                 │
+          ▼                 ▼                 ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│ LLM Manager     │ │ Vector Database │ │ Knowledge Graph │
+│                 │ │                 │ │ Storage         │
+├─────────────────┤ ├─────────────────┤ ├─────────────────┤
+│ • OpenAI API    │ │ • ChromaDB      │ │ • JSON files    │
+│ • Anthropic API │ │ • FAISS         │ │ • NetworkX      │
+│ • Ollama Local  │ │ • Fallback      │ │ • Cache         │
+│ • Direct API    │ │   embeddings    │ │ • Persistence   │
+└─────────┬───────┘ └─────────────────┘ └─────────────────┘
+          │
+          ▼
+┌─────────────────┐
+│ RAG Chain       │
+│                 │
+├─────────────────┤
+│ • Generate      │
+│   prompts       │
+│ • Combine       │
+│   context       │
+│ • Call LLM      │
+│ • Format        │
+│   responses     │
+└─────────────────┘
+
+DETAILED WORKFLOW
+=================
+
+1. SYSTEM INITIALIZATION
+   ┌─────────────┐
+   │ Start       │
+   └─────┬───────┘
+         │
+         ▼
+   ┌─────────────┐
+   │ Load Config │
+   └─────┬───────┘
+         │
+         ▼
+   ┌─────────────┐
+   │ Initialize  │
+   │ Components  │
+   └─────┬───────┘
+         │
+         ▼
+   ┌─────────────┐
+   │ Load Docs   │
+   └─────┬───────┘
+         │
+         ▼
+   ┌─────────────┐
+   │ Create      │
+   │ Embeddings  │
+   └─────┬───────┘
+         │
+         ▼
+   ┌─────────────┐
+   │ Extract KG  │
+   └─────┬───────┘
+         │
+         ▼
+   ┌─────────────┐
+   │ System      │
+   │ Ready       │
+   └─────────────┘
+
+2. QUERY PROCESSING
+   ┌─────────────┐
+   │ User        │
+   │ Question    │
+   └─────┬───────┘
+         │
+         ▼
+   ┌─────────────┐
+   │ Vector      │
+   │ Search      │
+   └─────┬───────┘
+         │
+         ▼
+   ┌─────────────┐
+   │ Has Results?│
+   └─────┬───────┘
+         │
+    ┌────┴────┐
+    │         │
+    ▼         ▼
+┌─────────┐ ┌─────────┐
+│ Yes     │ │ No      │
+│ Process │ │ Keyword │
+│ Results │ │ Search  │
+└─────┬───┘ └─────┬───┘
+      │           │
+      └─────┬─────┘
+            │
+            ▼
+   ┌─────────────┐
+   │ Query       │
+   │ Knowledge   │
+   │ Graph       │
+   └─────┬───────┘
+         │
+         ▼
+   ┌─────────────┐
+   │ Combine     │
+   │ Context     │
+   └─────┬───────┘
+         │
+         ▼
+   ┌─────────────┐
+   │ Generate    │
+   │ RAG Prompt  │
+   └─────┬───────┘
+         │
+         ▼
+   ┌─────────────┐
+   │ Call LLM    │
+   │ API         │
+   └─────┬───────┘
+         │
+         ▼
+   ┌─────────────┐
+   │ Format &    │
+   │ Return      │
+   │ Answer      │
+   └─────────────┘
+
+ERROR HANDLING & FALLBACKS
+==========================
+
+┌─────────────┐
+│ Try Sentence│
+│ Transformers│
+└─────┬───────┘
+      │
+      ▼
+┌─────────────┐
+│ Success?    │
+└─────┬───────┘
+      │
+   ┌──┴──┐
+   │     │
+   ▼     ▼
+┌─────┐ ┌─────┐
+│ Yes │ │ No  │
+│ Use │ │ Use │
+│ HF  │ │ Fall│
+│ Emb │ │ back│
+└─┬───┘ └─┬───┘
+  │       │
+  └───┬───┘
+      │
+      ▼
+┌─────────────┐
+│ Try Vector  │
+│ Search      │
+└─────┬───────┘
+      │
+      ▼
+┌─────────────┐
+│ Success?    │
+└─────┬───────┘
+      │
+   ┌──┴──┐
+   │     │
+   ▼     ▼
+┌─────┐ ┌─────┐
+│ Yes │ │ No  │
+│ Use │ │ Use │
+│ Vec │ │ Key │
+│ Res │ │ word│
+└─┬───┘ └─┬───┘
+  │       │
+  └───┬───┘
+      │
+      ▼
+┌─────────────┐
+│ Try LLM     │
+│ API         │
+└─────┬───────┘
+      │
+      ▼
+┌─────────────┐
+│ Success?    │
+└─────┬───────┘
+      │
+   ┌──┴──┐
+   │     │
+   ▼     ▼
+┌─────┐ ┌─────┐
+│ Yes │ │ No  │
+│ Use │ │ Use │
+│ Real│ │ Dum │
+│ LLM │ │ my  │
+└─────┘ └─────┘
+
+KEY FEATURES
+============
+
+✅ MULTI-FORMAT DOCUMENT LOADING
+   • Text files (.txt)
+   • PDF documents (.pdf)
+   • Markdown files (.md)
+   • Web pages (HTML)
+   • JSON files (.json)
+   • CSV files (.csv)
+
+✅ INTELLIGENT TEXT PROCESSING
+   • Configurable chunking
+   • Overlap management
+   • Metadata preservation
+   • Source tracking
+
+✅ VECTOR SIMILARITY SEARCH
+   • ChromaDB integration
+   • FAISS support
+   • Fallback embeddings
+   • Keyword search backup
+
+✅ KNOWLEDGE GRAPH EXTRACTION
+   • Entity recognition
+   • Relationship mapping
+   • Graph visualization
+   • Query capabilities
+
+✅ MULTIPLE LLM SUPPORT
+   • OpenAI GPT models
+   • Anthropic Claude
+   • Ollama local models
+   • Direct API calls
+
+✅ ROBUST ERROR HANDLING
+   • Embedding fallbacks
+   • Search alternatives
+   • LLM fallbacks
+   • Graceful degradation
+
+✅ USER INTERFACES
+   • Streamlit web app
+   • Command line interface
+   • Programmatic API
+   • Session management
+
+✅ EXTENSIBLE ARCHITECTURE
+   • Modular design
+   • Plugin system
+   • Configuration driven
+   • Easy customization 

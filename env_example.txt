@@ -1,0 +1,25 @@
+# RAG Knowledge Graph System - Environment Variables
+# Copy this file to .env and fill in your actual API keys
+
+# API Keys
+OPENAI_API_KEY=your_openai_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+
+# Cache and Output Directories
+CACHE_DIR=./cache
+OUTPUT_DIR=./output
+
+# ChromaDB Settings
+CHROMA_TELEMETRY_ENABLED=false
+
+# Ollama Configuration (optional, for local models)
+OLLAMA_BASE_URL=http://localhost:11434
+
+# System Configuration (optional)
+
+# Vector Store Configuration (optional)
+VECTOR_STORE_TYPE=chroma
+EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+
+# Knowledge Graph Configuration (optional)
+KNOWLEDGE_GRAPH_ENABLED=true 
